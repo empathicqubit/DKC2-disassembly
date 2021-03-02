@@ -1,5 +1,5 @@
 local base = string.gsub(@@LUA_SCRIPT_FILENAME@@, "(.*/)(.*)", "%1")
-dofile(base .. "text_area.lua")
+--dofile(base .. "text_area.lua")
 
 getmetatable('').__index = function(str, i) return string.sub(str, i, i) end
 
@@ -16,15 +16,15 @@ local function iterate(array)
     return function() i = i + 1; return array[i] end
 end
 
-local function parse_line(line) 
+local function parse_line(line)
 	local result = {}
 	local pos = string.find(line, '%g') or (string.len(line) + 1)
-	while line[pos] ~= "" do 
+	while line[pos] ~= "" do
 		if (line[pos] == '"') then
 			local start_pos, end_pos = string.find(line, '%b""', pos)
 			table.insert(result, string.sub(line, start_pos + 1, end_pos - 1))
 			pos = end_pos + 2
-		else	
+		else
 			local found_at = string.find(line, ',', pos)
 			table.insert(result, string.sub(line, pos, found_at and (found_at - 1) or -1))
 			pos = (found_at and found_at or string.len(line)) + 1
@@ -35,26 +35,26 @@ local function parse_line(line)
 end
 
 local function load_csv(path)
-	local file = io.open(path, "rb") 
+	local file = io.open(path, "rb")
 	local csv = {}
-	
-	if file then 
+
+	if file then
 		for line in io.lines(path) do
 			table.insert(csv, parse_line(line))
 		end
 		file:close()
 	end
-	
+
 	return csv;
 end
 
 local function list_to_map(list)
 	local map = {}
-	
+
 	for index, entry in ipairs(list) do
 		map[tonumber(entry[1])] = entry[2]
 	end
-	
+
 	return map
 end
 
@@ -126,7 +126,7 @@ local function rom_restore(address)
 end
 
 local function rom_restore_all(address)
-	for address, data in pairs(rom_write_buffer) do 
+	for address, data in pairs(rom_write_buffer) do
 		print(address, data, type(data))
 		memory2.BUS:writeregion(address, data)
 	end
@@ -199,15 +199,15 @@ local active_screen = engine_screen
 local opacity = 0x80
 local fg_color = 0x00FFFFFF
 local bg_color = 0x00000000
-local x_padding = -400
+local x_padding = 0
 local y_padding = 0
 
-local upper_left = text_area:new()
+--[[ local upper_left = text_area:new()
 upper_left:set_anchor(x_padding, 0)
 local bottom_left = text_area:new()
-bottom_left:set_anchor(x_padding, 550)
+bottom_left:set_anchor(x_padding, 550) ]]
 
-local context = gui.renderctx.new(256, 224) 
+local context = gui.renderctx.new(256, 224)
 
 --config files
 local sound_effects_path = base .. "sound_effects.txt"
@@ -226,10 +226,10 @@ local function text(x, y, message)
 end
 
 function clamp(value, low, high)
-	if(value < low) then 
-		return low 
-	elseif(value > high) then 
-		return high 
+	if(value < low) then
+		return low
+	elseif(value > high) then
+		return high
 	end
 	return value
 end
@@ -250,7 +250,7 @@ end
 local function word_table(offset, first, last)
 	local table = ""
 	offset = offset + first
-	count = (last - first) // 2
+	count = (last - first) / 2
 	for i=0,count do
 		if i % 0x08 == 0x00 and i > 0 then
 			table = table .. "\n"
@@ -262,7 +262,7 @@ end
 
 local tracked_addresses = {}
 local function store(address, value)
-	if(value == 0x00) then 
+	if(value == 0x00) then
 		return
 	end
 	tracked_addresses[address] = value
@@ -287,7 +287,7 @@ end
 
 local traced_addresses = {}
 local function handle_trace(address, value)
-	if(value == 0x00) then 
+	if(value == 0x00) then
 		return
 	end
 	tracked_addresses[address] = value
@@ -319,31 +319,32 @@ local sprite_routine_list = 0xB38348
 local function display_sprite()
 	local sprite_slot_id = clamp(slot, 0, 23)
 	local slot = sprite_table + sprite_slot_id * 0x5E
-	
-	upper_left:append_line("Slot number (0x%04X): %d",	slot, sprite_slot_id)
-	upper_left:append_line("Sprite: %s",			sprites_map[read_word(slot)] or "UNKNOWN")
-	upper_left:append_line("Sprite routine: $B3%04X",	read_rom_word(sprite_routine_list + read_word(slot)))
-	upper_left:append_line("Sprite number(0x00): %04X",	read_word(slot))
-	upper_left:append_line("Render order(0x02): %04X",	read_word(slot+0x02))
-	upper_left:append_line("Position(0x04/0x08): %s, %s", 	read_fixed_word(slot+0x04), read_fixed_word(slot+0x08))
-	upper_left:append_line("Potential Ground(0x0C): %04X",	read_word(slot+0x0C))
-	upper_left:append_line("Ground Distance(0x0E): %04X",	read_word(slot+0x0E))
-	upper_left:append_line("Interaction type(0x10): %04X",	read_word(slot+0x10))
-	upper_left:append_line("OAM property+tile(0x12): %04X",	read_word(slot+0x12))
-	upper_left:append_line("Unknown data(0x14): %04X",	read_word(slot+0x14))
-	upper_left:append_line("Sprite frame (0x16-0x1A):%s",	word_table(slot, 0x16, 0x1A))
-	upper_left:append_line("Unknown data(0x1C): %04X",	read_word(slot+0x1C))
-	upper_left:append_line("On Ground(0x1E): %04X",		read_word(slot+0x1E))
-	upper_left:append_line("X speed(0x20): %s",	 	read_byte(slot+0x20))
-	upper_left:append_line("Unknown data(0x22): %04X",	read_word(slot+0x22))
-	upper_left:append_line("Y speed(0x24): %s",		read_fixed_byte(slot+0x24))
-	upper_left:append_line("Max X speed(0x26): %s",		read_fixed_byte(slot+0x26))
-	upper_left:append_line("Unknown data(0x28):\n%s",	byte_table(slot, 0x28, 0x2D))
-	upper_left:append_line("Sprite action(0x2E):%04X",	read_word(slot+0x2E))
-	upper_left:append_line("Unknown data(0x30):\n%s",	byte_table(slot, 0x30, 0x55))
-	upper_left:append_line("Status index(0x56):%04X",	read_word(slot+0x56))
-	upper_left:append_line("Spawn code(0x58):%04X",		read_word(slot+0x58))
-	upper_left:append_line("Unknown data(0x5A):\n%s",	byte_table(slot, 0x5A, 0x5E))
+
+	text(0,0, string.format("Slot number (0x%04X): %d\n",	slot, sprite_slot_id) ..
+		string.format("Sprite: %s\n",			sprites_map[read_word(slot)] or "UNKNOWN") ..
+		string.format("Sprite routine: $B3%04X\n",	read_rom_word(sprite_routine_list .. read_word(slot))) ..
+		string.format("Sprite number(0x00): %04X\n",	read_word(slot)) ..
+		string.format("Render order(0x02): %04X\n",	read_word(slot..0x02)) ..
+		string.format("Position(0x04/0x08): %s, %s\n", 	read_fixed_word(slot..0x04), read_fixed_word(slot..0x08)) ..
+		string.format("Potential Ground(0x0C): %04X\n",	read_word(slot..0x0C)) ..
+		string.format("Ground Distance(0x0E): %04X\n",	read_word(slot..0x0E)) ..
+		string.format("Interaction type(0x10): %04X\n",	read_word(slot..0x10)) ..
+		string.format("OAM property..tile(0x12): %04X\n",	read_word(slot..0x12)) ..
+		string.format("Unknown data(0x14): %04X\n",	read_word(slot..0x14)) ..
+		string.format("Sprite frame (0x16-0x1A):%s\n",	word_table(slot, 0x16, 0x1A)) ..
+		string.format("Unknown data(0x1C): %04X\n",	read_word(slot..0x1C)) ..
+		string.format("On Ground(0x1E): %04X\n",		read_word(slot..0x1E)) ..
+		string.format("X speed(0x20): %s\n",	 	read_byte(slot..0x20)) ..
+		string.format("Unknown data(0x22): %04X\n",	read_word(slot..0x22)) ..
+		string.format("Y speed(0x24): %s\n",		read_fixed_byte(slot..0x24)) ..
+		string.format("Max X speed(0x26): %s\n",		read_fixed_byte(slot..0x26)) ..
+		string.format("Unknown data(0x28):\n%s\n",	byte_table(slot, 0x28, 0x2D)) ..
+		string.format("Sprite action(0x2E):%04X\n",	read_word(slot..0x2E)) ..
+		string.format("Unknown data(0x30):\n%s\n",	byte_table(slot, 0x30, 0x55)) ..
+		string.format("Status index(0x56):%04X\n",	read_word(slot..0x56)) ..
+		string.format("Spawn code(0x58):%04X\n",		read_word(slot..0x58)) ..
+		string.format("Unknown data(0x5A):\n%s\n",	byte_table(slot, 0x5A, 0x5E))
+	)
 end
 
 local musics_list = load_csv(musics_path)
@@ -369,7 +370,7 @@ track(sound_buffer+0x0C, 2)
 track(sound_buffer+0x0E, 2)
 
 local function display_sound()
-	local sound_effect = clamp(slot, 0, 0x7F)		
+	local sound_effect = clamp(slot, 0, 0x7F)
 	if play_sound_effect == true then
 		write_word(sound_effect, 0x0619 + 10)
 		write_word(sound_effect + 0x0500, 0x0622)
@@ -378,35 +379,37 @@ local function display_sound()
 		play_sound_effect = false
 	end
 
-	upper_left:append_line("Current index: %02X", read_word(sound_index))
-	upper_left:append_line("cmd 0(0x00): %04X", tracked_addresses[sound_buffer+0x00])
-	upper_left:append_line("cmd 1(0x02): %04X", tracked_addresses[sound_buffer+0x02])
-	upper_left:append_line("cmd 2(0x04): %04X", tracked_addresses[sound_buffer+0x04])
-	upper_left:append_line("cmd 3(0x06): %04X", tracked_addresses[sound_buffer+0x06])
-	upper_left:append_line("cmd 4(0x08): %04X", tracked_addresses[sound_buffer+0x08])
-	upper_left:append_line("cmd 5(0x0A): %04X", tracked_addresses[sound_buffer+0x0A])
-	upper_left:append_line("cmd 6(0x0C): %04X", tracked_addresses[sound_buffer+0x0C])
-	upper_left:append_line("cmd 7(0x0E): %04X", tracked_addresses[sound_buffer+0x0E])
-	upper_left:append_line("sfx 0(0x00): %02X", read_byte(effect_buffer+0x00))
-	upper_left:append_line("sfx 1(0x01): %02X", read_byte(effect_buffer+0x01))
-	upper_left:append_line("sfx 2(0x02): %02X", read_byte(effect_buffer+0x02))
-	upper_left:append_line("sfx 3(0x03): %02X", read_byte(effect_buffer+0x03))
-	upper_left:append_line("sfx 4(0x04): %02X", read_byte(effect_buffer+0x04))
-	upper_left:append_line("sfx 5(0x05): %02X", read_byte(effect_buffer+0x05))
-	upper_left:append_line("sfx 6(0x06): %02X", read_byte(effect_buffer+0x06))
-	upper_left:append_line("sfx 7(0x07): %02X", read_byte(effect_buffer+0x07))
-	upper_left:append_line("sfx 8(0x08): %02X", read_byte(effect_buffer+0x08))
-	upper_left:append_line("sfx 9(0x09): %02X", read_byte(effect_buffer+0x09))
-	upper_left:append_line("sfx A(0x0A): %02X", read_byte(effect_buffer+0x0A))
-	upper_left:append_line("sfx B(0x0B): %02X", read_byte(effect_buffer+0x0B))
-	upper_left:append_line("sfx C(0x0C): %02X", read_byte(effect_buffer+0x0C))
-	upper_left:append_line("sfx D(0x0D): %02X", read_byte(effect_buffer+0x0D))
-	upper_left:append_line("sfx E(0x0E): %02X", read_byte(effect_buffer+0x0E))
-	upper_left:append_line("sfx F(0x0F): %02X", read_byte(effect_buffer+0x0F))
-	upper_left:append_line("SPC transfer id: 0x%02X", read_byte(spc_transfer_id))
-	upper_left:append_line("Current song: %04X (%s)", read_byte(current_song), musics_map[read_byte(current_song)])
-	upper_left:append_line("Mono/Stereo: %02X", read_byte(stereo_flag))
-	upper_left:append_line("Play sound effect: %s", sound_effect_map[sound_effect])
+	text(0, 0,
+		string.format("Current index: %02X", read_word(sound_index)) ..
+		string.format("\ncmd 0(0x00): %04X", tracked_addresses[sound_buffer..0x00]) ..
+		string.format("\ncmd 1(0x02): %04X", tracked_addresses[sound_buffer..0x02]) ..
+		string.format("\ncmd 2(0x04): %04X", tracked_addresses[sound_buffer..0x04]) ..
+		string.format("\ncmd 3(0x06): %04X", tracked_addresses[sound_buffer..0x06]) ..
+		string.format("\ncmd 4(0x08): %04X", tracked_addresses[sound_buffer..0x08]) ..
+		string.format("\ncmd 5(0x0A): %04X", tracked_addresses[sound_buffer..0x0A]) ..
+		string.format("\ncmd 6(0x0C): %04X", tracked_addresses[sound_buffer..0x0C]) ..
+		string.format("\ncmd 7(0x0E): %04X", tracked_addresses[sound_buffer..0x0E]) ..
+		string.format("\nsfx 0(0x00): %02X", read_byte(effect_buffer..0x00)) ..
+		string.format("\nsfx 1(0x01): %02X", read_byte(effect_buffer..0x01)) ..
+		string.format("\nsfx 2(0x02): %02X", read_byte(effect_buffer..0x02)) ..
+		string.format("\nsfx 3(0x03): %02X", read_byte(effect_buffer..0x03)) ..
+		string.format("\nsfx 4(0x04): %02X", read_byte(effect_buffer..0x04)) ..
+		string.format("\nsfx 5(0x05): %02X", read_byte(effect_buffer..0x05)) ..
+		string.format("\nsfx 6(0x06): %02X", read_byte(effect_buffer..0x06)) ..
+		string.format("\nsfx 7(0x07): %02X", read_byte(effect_buffer..0x07)) ..
+		string.format("\nsfx 8(0x08): %02X", read_byte(effect_buffer..0x08)) ..
+		string.format("\nsfx 9(0x09): %02X", read_byte(effect_buffer..0x09)) ..
+		string.format("\nsfx A(0x0A): %02X", read_byte(effect_buffer..0x0A)) ..
+		string.format("\nsfx B(0x0B): %02X", read_byte(effect_buffer..0x0B)) ..
+		string.format("\nsfx C(0x0C): %02X", read_byte(effect_buffer..0x0C)) ..
+		string.format("\nsfx D(0x0D): %02X", read_byte(effect_buffer..0x0D)) ..
+		string.format("\nsfx E(0x0E): %02X", read_byte(effect_buffer..0x0E)) ..
+		string.format("\nsfx F(0x0F): %02X", read_byte(effect_buffer..0x0F)) ..
+		string.format("\nSPC transfer id: 0x%02X", read_byte(spc_transfer_id)) ..
+		string.format("\nCurrent song: %04X (%s)", read_byte(current_song), musics_map[read_byte(current_song)]) ..
+		string.format("\nMono/Stereo: %02X", read_byte(stereo_flag)) ..
+		string.format("\nPlay sound effect: %s", sound_effect_map[sound_effect])
+	)
 end
 
 local camera_x = 0x17BA
@@ -425,18 +428,20 @@ local tiledata_pointer = 0x0098
 track(tiledata_pointer, 3)
 
 local function display_camera()
-	upper_left:append_line("Camera X: %04X", read_word(camera_x))
-	upper_left:append_line("Camera unknown 1: %04X", read_word(camera_unknown1))
-	upper_left:append_line("Camera unknown 2: %04X", read_word(camera_unknown2))
-	upper_left:append_line("Camera Y inc: %04X", read_word(camera_y_inc))
-	upper_left:append_line("Camera Y: %04X", read_word(camera_y))
-	upper_left:append_line("Camera unknown 3: %04X", read_word(camera_unknown3))
-	upper_left:append_line("Camera unknown 4: %04X", read_word(camera_unknown4))
-	upper_left:append_line("Camera unknown 5: %04X", read_word(camera_unknown5))
-	upper_left:append_line("Camera last update X: %04X", read_word(camera_last_update_x))
-	upper_left:append_line("Camera unknown 6: %04X", read_word(camera_unknown6))
-	upper_left:append_line("Camera last update Y: %04X", read_word(camera_last_update_y))
-	upper_left:append_line("Tiledata pointer: %06X", tracked_addresses[tiledata_pointer])
+	text(0, 0,
+		string.format("Camera X: %04X", read_word(camera_x)) ..
+		string.format("\nCamera unknown 1: %04X", read_word(camera_unknown1)) ..
+		string.format("\nCamera unknown 2: %04X", read_word(camera_unknown2)) ..
+		string.format("\nCamera Y inc: %04X", read_word(camera_y_inc)) ..
+		string.format("\nCamera Y: %04X", read_word(camera_y)) ..
+		string.format("\nCamera unknown 3: %04X", read_word(camera_unknown3)) ..
+		string.format("\nCamera unknown 4: %04X", read_word(camera_unknown4)) ..
+		string.format("\nCamera unknown 5: %04X", read_word(camera_unknown5)) ..
+		string.format("\nCamera last update X: %04X", read_word(camera_last_update_x)) ..
+		string.format("\nCamera unknown 6: %04X", read_word(camera_unknown6)) ..
+		string.format("\nCamera last update Y: %04X", read_word(camera_last_update_y)) ..
+		string.format("\nTiledata pointer: %06X", tracked_addresses[tiledata_pointer])
+	)
 end
 
 local NMI = 0x0020
@@ -448,12 +453,14 @@ local frame_counter = 0x002A
 local active_frame_counter = 0x002C
 
 local function display_engine()
-	upper_left:append_line("NMI: %04X", read_word(NMI))
-	upper_left:append_line("Game loop: %04X", read_word(game_loop))
-	upper_left:append_line("Game mode NMI: %04X", read_word(game_mode_NMI))
-	upper_left:append_line("Game mode: %04X", read_word(game_mode))
-	upper_left:append_line("Frame counter: %04X", read_word(frame_counter))
-	upper_left:append_line("Active frame counter: %04X", read_word(active_frame_counter))
+	text(0, 0,
+		string.format("NMI: %04X", read_word(NMI)) ..
+		string.format("\nGame loop: %04X", read_word(game_loop)) ..
+		string.format("\nGame mode NMI: %04X", read_word(game_mode_NMI)) ..
+		string.format("\nGame mode: %04X", read_word(game_mode)) ..
+		string.format("\nFrame counter: %04X", read_word(frame_counter)) ..
+		string.format("\nActive frame counter: %04X", read_word(active_frame_counter))
+	)
 end
 
 local level = 0x00D3
@@ -462,53 +469,56 @@ local level_header = 0x0515
 
 local function display_level()
 	local level_id = read_word(level)
-	
-	upper_left:append_line("level number: %04X", level_id)
-	upper_left:append_line("Sprite data pointer: FF%04X\n", read_rom_word(sprite_pointers + level_id*2))
-	upper_left:append_line("LEVEL HEADER")
-	upper_left:append_line("$0515 (0x00) Header: 0x%04X", read_word(level_header + 0x00))
-	upper_left:append_line("$0517 (0x02): 0x%04X", read_word(level_header + 0x02))
-	upper_left:append_line("$0519 (0x04): 0x%04X", read_word(level_header + 0x04))
-	upper_left:append_line("$051B (0x06): Music id 0x%04X", read_word(level_header + 0x06))
-	upper_left:append_line("$051D (0x08): 0x%04X", read_word(level_header + 0x08))
-	upper_left:append_line("$051F (0x0A): 0x%04X", read_word(level_header + 0x0A))
-	upper_left:append_line("$0521 (0x0C): 0x%04X", read_word(level_header + 0x0C))
-	upper_left:append_line("$0523 (0x0E): 0x%04X", read_word(level_header + 0x0E))
-	upper_left:append_line("$0525 (0x10): 0x%04X", read_word(level_header + 0x10))
-	upper_left:append_line("$0527 (0x12) NMI Pointer: 0x%04X", read_word(level_header + 0x12))
-	upper_left:append_line("$0529 (0x14) Level mode Pointer: 0x%04X", read_word(level_header + 0x14))
-	upper_left:append_line("$052B (0x16): 0x%04X", read_word(level_header + 0x16))
-	upper_left:append_line("$052D (0x18): 0x%04X", read_word(level_header + 0x18))
-	upper_left:append_line("$052F (0x1A): 0x%04X", read_word(level_header + 0x1A))
-	upper_left:append_line("$0531 (0x1C): 0x%04X", read_word(level_header + 0x1C))
-	upper_left:append_line("$0533 (0x1E) Spawn X position: 0x%04X", read_word(level_header + 0x1E))
-	upper_left:append_line("$0535 (0x20) Spawn Y position: 0x%04X", read_word(level_header + 0x20))
-	upper_left:append_line("$0537 (0x22): 0x%04X", read_word(level_header + 0x22))
-	upper_left:append_line("$0539 (0x24): 0x%04X", read_word(level_header + 0x24))
-	upper_left:append_line("$053B (0x26): 0x%04X", read_word(level_header + 0x26))
-	upper_left:append_line("$053D (0x28) Exit 1: 0x%04X", read_word(level_header + 0x28))
-	upper_left:append_line("$053F (0x2A) Exit 2: 0x%04X", read_word(level_header + 0x2A))
-	upper_left:append_line("$0541 (0x2C) Exit 3: 0x%04X", read_word(level_header + 0x2C))
-	upper_left:append_line("$0543 (0x2E) Exit 4: 0x%04X", read_word(level_header + 0x2E))
-	upper_left:append_line("$0545 (0x30) Exit 5: 0x%04X", read_word(level_header + 0x30))
-	upper_left:append_line("$0547 (0x32) Exit 6: 0x%04X", read_word(level_header + 0x32))
-	upper_left:append_line("$0549 (0x34) Exit 7: 0x%04X", read_word(level_header + 0x34))
-	upper_left:append_line("$054B (0x36) Exit 8: 0x%04X", read_word(level_header + 0x36))
-	upper_left:append_line("$054D (0x38): 0x%04X", read_word(level_header + 0x38))
-	upper_left:append_line("$0551 (0x3A): 0x%04X", read_word(level_header + 0x3A))
+
+	text(0,0,
+		string.format("level number: %04X", level_id) ..
+		string.format("\nSprite data pointer: FF%04X\n", read_rom_word(sprite_pointers + level_id*2)) ..
+		string.format("\nLEVEL HEADER") ..
+		string.format("\n$0515 (0x00) Header: 0x%04X", read_word(level_header + 0x00)) ..
+		string.format("\n$0517 (0x02): 0x%04X", read_word(level_header + 0x02)) ..
+		string.format("\n$0519 (0x04): 0x%04X", read_word(level_header + 0x04)) ..
+		string.format("\n$051B (0x06): Music id 0x%04X", read_word(level_header + 0x06)) ..
+		string.format("\n$051D (0x08): 0x%04X", read_word(level_header + 0x08)) ..
+		string.format("\n$051F (0x0A): 0x%04X", read_word(level_header + 0x0A)) ..
+		string.format("\n$0521 (0x0C): 0x%04X", read_word(level_header + 0x0C)) ..
+		string.format("\n$0523 (0x0E): 0x%04X", read_word(level_header + 0x0E)) ..
+		string.format("\n$0525 (0x10): 0x%04X", read_word(level_header + 0x10)) ..
+		string.format("\n$0527 (0x12) NMI Pointer: 0x%04X", read_word(level_header + 0x12)) ..
+		string.format("\n$0529 (0x14) Level mode Pointer: 0x%04X", read_word(level_header + 0x14)) ..
+		string.format("\n$052B (0x16): 0x%04X", read_word(level_header + 0x16)) ..
+		string.format("\n$052D (0x18): 0x%04X", read_word(level_header + 0x18)) ..
+		string.format("\n$052F (0x1A): 0x%04X", read_word(level_header + 0x1A)) ..
+		string.format("\n$0531 (0x1C): 0x%04X", read_word(level_header + 0x1C)) ..
+		string.format("\n$0533 (0x1E) Spawn X position: 0x%04X", read_word(level_header + 0x1E)) ..
+		string.format("\n$0535 (0x20) Spawn Y position: 0x%04X", read_word(level_header + 0x20)) ..
+		string.format("\n$0537 (0x22): 0x%04X", read_word(level_header + 0x22)) ..
+		string.format("\n$0539 (0x24): 0x%04X", read_word(level_header + 0x24)) ..
+		string.format("\n$053B (0x26): 0x%04X", read_word(level_header + 0x26)) ..
+		string.format("\n$053D (0x28) Exit 1: 0x%04X", read_word(level_header + 0x28)) ..
+		string.format("\n$053F (0x2A) Exit 2: 0x%04X", read_word(level_header + 0x2A)) ..
+		string.format("\n$0541 (0x2C) Exit 3: 0x%04X", read_word(level_header + 0x2C)) ..
+		string.format("\n$0543 (0x2E) Exit 4: 0x%04X", read_word(level_header + 0x2E)) ..
+		string.format("\n$0545 (0x30) Exit 5: 0x%04X", read_word(level_header + 0x30)) ..
+		string.format("\n$0547 (0x32) Exit 6: 0x%04X", read_word(level_header + 0x32)) ..
+		string.format("\n$0549 (0x34) Exit 7: 0x%04X", read_word(level_header + 0x34)) ..
+		string.format("\n$054B (0x36) Exit 8: 0x%04X", read_word(level_header + 0x36)) ..
+		string.format("\n$054D (0x38): 0x%04X", read_word(level_header + 0x38)) ..
+		string.format("\n$0551 (0x3A): 0x%04X", read_word(level_header + 0x3A))
+	)
 end
 
 local watched_addresses = {}
 local exec_watched_addresses = {}
 local exec_watched_count = {}
 local function display_watch()
-	upper_left:append_line("RAM watches: ")
-	for address, read_callback in pairs(watched_addresses) do 
-		upper_left:append_line(read_callback())
+	local str = ""
+	str = str.."\nRAM watches: "
+	for address, read_callback in pairs(watched_addresses) do
+		str = str.."\n"..read_callback()
 	end
-	upper_left:append_line("Execution counts: ")
-	for address, read_callback in pairs(exec_watched_addresses) do 
-		upper_left:append_line(read_callback())
+	str = str.."\nExecution counts: "
+	for address, read_callback in pairs(exec_watched_addresses) do
+		str = str.."\n"..read_callback()
 	end
 end
 
@@ -517,9 +527,8 @@ local function display_ppu_state()
 	ppu_layer_state = ppu_layer_state .. (layer_state[1] and "Enabled, " or "Disabled, ")
 	ppu_layer_state = ppu_layer_state .. (layer_state[2] and "Enabled, " or "Disabled, ")
 	ppu_layer_state = ppu_layer_state .. (layer_state[3] and "Enabled" or "Disabled") .. "}"
-	
-	bottom_left:append_line(dump_mmio_string())
-	bottom_left:append_line(ppu_layer_state)
+
+	text(0, 200, dump_mmio_string().."\n"..ppu_layer_state)
 end
 
 local function display_cgram_state()
@@ -570,7 +579,7 @@ function on_paint(not_synth)
 	if show_debug then
 		context:clear()
 		context:set()
-		
+
 		if active_screen == sprite_screen then
 			display_sprite()
 		elseif active_screen == sound_screen then
@@ -584,13 +593,13 @@ function on_paint(not_synth)
 		elseif active_screen == watch_screen then
 			display_watch()
 		end
-		
+
 		display_ppu_state()
 		display_cgram_state()
 
-		upper_left:render()
-		bottom_left:render()
-		
+--[[ 		upper_left:render()
+		bottom_left:render() ]]
+
 		gui.renderctx.setnull()
 		context:run()
 	end
@@ -613,14 +622,14 @@ function on_dma(trigger_addr, source_addr, dest_addr, size, mode, dir, fixed)
 			return
 		end
 	end
-	
+
 	name = string.format("(%d)_$%06X:_$%06X_to_$21%02X.bin", counter, trigger_addr, source_addr, dest_addr)
 	zip_file:create_file(name)
-	
+
 	if size == 0 then
 		size = 65536
 	end
-	
+
 	for i=0, size-1 do
 		if fixed == 1 then
 			zip_file:write(string.char(memory2.BUS:read(source_addr)))
@@ -628,37 +637,37 @@ function on_dma(trigger_addr, source_addr, dest_addr, size, mode, dir, fixed)
 			zip_file:write(string.char(memory2.BUS:read(source_addr+i)))
 		end
 	end
-	
+
 	if fixed == true then
 		size = 1
 	end
 	extra_details = ""
-	
+
 	if dest_addr == 0x18 then
 		extra_details = dump_mmio_string()
 	else
 		extra_details = "N/A"
 	end
-	
+
 	dma_table[counter] = string.format("%s: %s\n %s\n\n", name, memory2.BUS:sha256(source_addr, size), extra_details)
-	
+
 	counter = counter + 1
 end
 
 function on_vm_reset()
 	zip_file:create_file("summary.txt")
-	for i=0, #dma_table do 
+	for i=0, #dma_table do
 		zip_file:write(dma_table[i])
 	end
 	zip_file:commit()
 	rom_restore_all()
-end 
+end
 
 
 function dump_mmio_string()
 	local layers_string = ""
 	local layer_string = "Layer: %d, tilemap: 0x%04X, tiledata: 0x%04X, S: %d, X: 0x%04X, Y: 0x%04X\n"
-	
+
 	for i = 0, 3 do
 		layers_string = layers_string .. string.format(layer_string,
 									i+1,
@@ -755,7 +764,7 @@ end
 
 if get_file_type("screens") == "directory" then
 	local screen_plugins = get_directory_contents("screens", "", "*.lua")
-	
+
 	for file in iterate(screen_plugins) do
 		dofile(file)
 	end
